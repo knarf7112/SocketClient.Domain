@@ -15,7 +15,8 @@ namespace SocketClient.Domain
     {
         //private static readonly ILog log = LogManager.GetLogger(typeof(SocketClient));
         private TcpClient tcpClient;
-        private IPEndPoint ipEndPoint;
+        private IPEndPoint remoteIpEndPoint;
+        private IPEndPoint localIpEndPoint;
         public const int ReceiveBufferSize = 4096;
 
         private string _ip;
@@ -47,12 +48,19 @@ namespace SocketClient.Domain
         }
 
         #region Constructor
+        /// <summary>
+        /// 指定連線遠端的IP和Port預設送出和收到逾時為0
+        /// </summary>
+        /// <param name="ip">遠端IP</param>
+        /// <param name="port">遠端Port</param>
+        /// <param name="sendTimeout">送出逾時(ms)</param>
+        /// <param name="receiveTimeout">收到逾時(ms)</param>
         public SocketClient(string ip, int port, int sendTimeout = 0, int receiveTimeout = 0)
         {
             try
             {
                 //IPAddress ipObj = Dns.GetHostAddresses(ip)[0];
-                this.ipEndPoint = new IPEndPoint(IPAddress.Parse(ip), port);
+                this.remoteIpEndPoint = new IPEndPoint(IPAddress.Parse(ip), port);
                 this.tcpClient = new TcpClient();
                 this.tcpClient.ReceiveTimeout = receiveTimeout;
                 this.tcpClient.SendTimeout = sendTimeout;
@@ -63,11 +71,24 @@ namespace SocketClient.Domain
                 throw ex;
             }
         }
+
+        /// <summary>
+        /// 連線遠端並指定本地端IP和Port
+        /// </summary>
+        /// <param name="remoteIP">遠端IP</param>
+        /// <param name="remotePort">遠端Port</param>
+        /// <param name="localIP">本地端IP</param>
+        /// <param name="localPort">本地端Port</param>
+        /// <param name="sendTimeout">Send Timeout(default:0ms)</param>
+        /// <param name="receiveTimeout">Receive Timeout(default:0ms)</param>
         public SocketClient(string remoteIP, int remotePort, string localIP, int localPort, int sendTimeout = 0, int receiveTimeout = 0)
             : this(remoteIP, remotePort, sendTimeout, receiveTimeout)
         {
-
+            this.localIpEndPoint = new IPEndPoint(IPAddress.Parse(localIP), localPort);
         }
+        /// <summary>
+        /// 自行設定遠端IP和Port(沒設定會拋出異常)
+        /// </summary>
         public SocketClient()
         {
             this.OnIPEndPointError += ThrowSettingError;
@@ -75,7 +96,14 @@ namespace SocketClient.Domain
         #endregion
 
         #region Delegate and Event
+        /// <summary>
+        /// 抓取Exception
+        /// </summary>
+        /// <param name="ex"></param>
         public delegate void CatchException(Exception ex);
+        /// <summary>
+        /// 抓內部Socket的Exception
+        /// </summary>
         public CatchException OnCatchException { get; set; }
         private delegate void IPEndPointError();
         private event IPEndPointError OnIPEndPointError;  
@@ -92,6 +120,10 @@ namespace SocketClient.Domain
         #endregion
 
         #region Public Method
+        /// <summary>
+        /// Socket連線遠端
+        /// </summary>
+        /// <returns>成功/失敗</returns>
         public bool ConnectToServer()
         {
             try
@@ -100,13 +132,14 @@ namespace SocketClient.Domain
                 {
                     this.tcpClient = new TcpClient();
                 }
-                if (this.ipEndPoint == null)
+                if (this.remoteIpEndPoint == null)
                 {
-                    this.ipEndPoint = new IPEndPoint(IPAddress.Parse(this.IP), this.Port);
+                    this.remoteIpEndPoint = new IPEndPoint(IPAddress.Parse(this.IP), this.Port);
                 }
                 //this.tcpClient.BeginConnect(this.ipEndPoint.Address,this.ipEndPoint.Port,)
-                //this.tcpClient.Client.Bind()
-                this.tcpClient.Connect(this.ipEndPoint);
+                if (localIpEndPoint != null)
+                    this.tcpClient.Client.Bind(localIpEndPoint);
+                this.tcpClient.Connect(this.remoteIpEndPoint);
 
                 if (this.tcpClient.Connected || this.SocketConnect(this.tcpClient.Client))
                 {
@@ -260,6 +293,10 @@ namespace SocketClient.Domain
                 return false;
             }
         }
+
+        /// <summary>
+        /// 關閉Socket Client連結
+        /// </summary>
         public void CloseConnection()
         {
             //log.Debug("Start Dispose...");
