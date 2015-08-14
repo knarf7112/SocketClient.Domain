@@ -13,7 +13,7 @@ namespace SocketClient.Domain
     /// <typeparam name="T">要傳輸的物件類型</typeparam>
     public class SocketClient : ISocketClient
     {
-        //private static readonly ILog log = LogManager.GetLogger(typeof(SocketClient));
+        private static readonly ILog log = LogManager.GetLogger(typeof(SocketClient));
         private TcpClient tcpClient;
         private IPEndPoint remoteIpEndPoint;
         private IPEndPoint localIpEndPoint;
@@ -67,7 +67,7 @@ namespace SocketClient.Domain
             }
             catch (Exception ex)
             {
-                //log.Error("Socket Client Constructor Failed:" + ex.Message);
+                log.Error("Socket Client Constructor Failed:" + ex.Message);
                 throw ex;
             }
         }
@@ -128,10 +128,11 @@ namespace SocketClient.Domain
         {
             try
             {
-                if (this.tcpClient == null)
+                if (this.tcpClient == null || this.tcpClient.Connected)
                 {
                     this.tcpClient = new TcpClient();
                 }
+                
                 if (this.remoteIpEndPoint == null)
                 {
                     this.remoteIpEndPoint = new IPEndPoint(IPAddress.Parse(this.IP), this.Port);
@@ -154,7 +155,7 @@ namespace SocketClient.Domain
             }
             catch (Exception ex)
             {
-                //log.Error("Socket Client Connection Error: " + ex.Message);
+                log.Error("Socket Client Connection Error: " + ex.Message);
                 if (OnCatchException != null)
                 {
                     OnCatchException.Invoke(ex);
@@ -203,7 +204,7 @@ namespace SocketClient.Domain
             }
             catch (Exception ex)
             {
-                //log.Error("Socket Client SendAndReceive Failed: " + ex.Message);
+                log.Error("Socket Client SendAndReceive Failed: " + ex.Message);
                 //Console.WriteLine("Socket Client SendAndReceive Failed: " + ex.Message);
                 if (OnCatchException != null)
                 {
@@ -258,7 +259,7 @@ namespace SocketClient.Domain
                 {
                     OnCatchException.Invoke(ex);
                 }
-                //log.Error("Socket Client SendAndReceive Failed: " + ex.Message);
+                log.Error("Socket Client SendAndReceive Failed: " + ex.Message);
                 //Console.WriteLine("Socket Client SendAndReceive Failed: " + ex.Message);
                 this.Dispose();
                 socketErr = SocketError.SocketError;
@@ -285,7 +286,8 @@ namespace SocketClient.Domain
             }
             catch (Exception ex)
             {
-                //Console.WriteLine("Connect Error:" + ex.ToString());
+
+                log.Error("Check Socket ConnectState Error:" + ex.StackTrace);
                 if (this.OnCatchException != null)
                 {
                     this.OnCatchException.Invoke(ex);
@@ -304,14 +306,16 @@ namespace SocketClient.Domain
             {
                 try
                 {
-                    this.tcpClient.Client.Shutdown(SocketShutdown.Both);
+                    if (this.tcpClient.Connected)
+                        this.tcpClient.Client.Shutdown(SocketShutdown.Both);
                     this.tcpClient.Close();
                     this.tcpClient = null;
                 }
                 catch (SocketException ex)
                 {
-                    //log.Error("Socket Client Dispose Error: " + ex.Message);
-                    throw ex;
+                    log.Error("Socket Client Dispose Error: " + ex.Message);
+                    this.tcpClient = null;
+                    //throw ex;
                 }
             }
             this.OnCatchException = null;
