@@ -128,9 +128,14 @@ namespace SocketClient.Domain
         {
             try
             {
-                if (this.tcpClient == null || this.tcpClient.Connected)
+                
+                if (this.tcpClient == null)
                 {
                     this.tcpClient = new TcpClient();
+                }
+                else if (this.tcpClient.Connected)
+                {
+                    this.tcpClient.Client.Disconnect(true);
                 }
                 
                 if (this.remoteIpEndPoint == null)
