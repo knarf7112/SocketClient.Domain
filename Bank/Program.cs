@@ -15,7 +15,69 @@ namespace Bank
         {
             try
             {
-               
+                byte[] receive;
+                byte[] sendData = Encoding.UTF8.GetBytes("Hello Test123");
+                SocketClient.Domain.SocketClient client = new SocketClient.Domain.SocketClient("127.0.0.1", 6111, 300000, 300000);
+                Console.WriteLine("開始連線 ...");
+                if (client.ConnectToServer())
+                {
+                    Console.WriteLine("開始收送資料 ...");
+                    receive = client.SendAndReceive(sendData);
+                    if (receive != null)
+                    {
+                        Console.WriteLine("回應資料:" + Encoding.UTF8.GetString(receive));
+                    }
+                }
+                Console.WriteLine("按任意鍵繼續 ...");
+                Console.ReadKey();
+                Console.WriteLine("開始連線 ...");
+                if (client.ConnectToServer())
+                {
+                    Console.WriteLine("開始收送資料 ...");
+                    receive = client.SendAndReceive(sendData);
+                    if (receive != null)
+                    {
+                        Console.WriteLine("回應資料:" + Encoding.UTF8.GetString(receive));
+                    }
+                }
+                Console.WriteLine("按任意鍵繼續 ...");
+                Console.ReadKey();
+                Console.WriteLine("開始連線 ...");
+                if (client.ConnectToServer())
+                {
+                    Console.WriteLine("開始收送資料 ...");
+                    receive = client.SendAndReceive(sendData);
+                    if (receive != null)
+                    {
+                        Console.WriteLine("回應資料:" + Encoding.UTF8.GetString(receive));
+                    }
+                }
+                Console.WriteLine("按任意鍵繼續 ...");
+                Console.ReadKey();
+                Console.WriteLine("開始連線 ...");
+                if (client.ConnectToServer())
+                {
+                    Console.WriteLine("開始收送資料 ...");
+                    receive = client.SendAndReceive(sendData);
+                    if (receive != null)
+                    {
+                        Console.WriteLine("回應資料:" + Encoding.UTF8.GetString(receive));
+                    }
+                }
+                Console.WriteLine("按任意鍵繼續 ...");
+                Console.ReadKey();
+                Console.WriteLine("開始連線 ...");
+                if (client.ConnectToServer())
+                {
+                    Console.WriteLine("開始收送資料 ...");
+                    receive = client.SendAndReceive(sendData);
+                    if (receive != null)
+                    {
+                        Console.WriteLine("回應資料:" + Encoding.UTF8.GetString(receive));
+                    }
+                }
+                Console.WriteLine("按任意鍵繼續 ...");
+                Console.ReadKey();
                 ////Creates the Socket for sending data over TCP.
                 //Socket s = new Socket(AddressFamily.InterNetwork, SocketType.Stream,
                 //   ProtocolType.Tcp);
