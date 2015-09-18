@@ -14,14 +14,15 @@ namespace SocketClient.Domain
     public class SocketClient : ISocketClient
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(SocketClient));
-        private TcpClient tcpClient;
+        private Socket sckClient;
         private IPEndPoint remoteIpEndPoint;
         private IPEndPoint localIpEndPoint;
         public const int ReceiveBufferSize = 4096;
 
         private string _ip;
         private int _port;
-
+        private int sendTimeout;
+        private int receiveTimeout;
         public string IP 
         {
             get 
@@ -60,16 +61,26 @@ namespace SocketClient.Domain
             try
             {
                 //IPAddress ipObj = Dns.GetHostAddresses(ip)[0];
-                this.remoteIpEndPoint = new IPEndPoint(IPAddress.Parse(ip), port);
-                this.tcpClient = new TcpClient();
-                this.tcpClient.ReceiveTimeout = receiveTimeout;
-                this.tcpClient.SendTimeout = sendTimeout;
+                this.IP = ip;
+                this.Port = port;
+                this.receiveTimeout = receiveTimeout;
+                this.sendTimeout = sendTimeout;
+                this.InitSocketClient();
             }
             catch (Exception ex)
             {
                 log.Error("Socket Client Constructor Failed:" + ex.Message);
                 throw ex;
             }
+        }
+
+        private void InitSocketClient()
+        {
+            log.Debug(m => m("[InitSocketClient] initial socket"));
+            this.remoteIpEndPoint = new IPEndPoint(IPAddress.Parse(this.IP), this.Port);
+            this.sckClient = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            this.sckClient.ReceiveTimeout = this.receiveTimeout;
+            this.sckClient.SendTimeout = this.sendTimeout;
         }
 
         /// <summary>
@@ -129,25 +140,28 @@ namespace SocketClient.Domain
             try
             {
                 
-                if (this.tcpClient == null)
+                if (this.sckClient == null)
                 {
-                    this.tcpClient = new TcpClient();
+                    this.InitSocketClient();
                 }
-                else if (this.tcpClient.Connected)
-                {
-                    this.tcpClient.Client.Disconnect(true);
-                }
-                
+
                 if (this.remoteIpEndPoint == null)
                 {
                     this.remoteIpEndPoint = new IPEndPoint(IPAddress.Parse(this.IP), this.Port);
                 }
-                //this.tcpClient.BeginConnect(this.ipEndPoint.Address,this.ipEndPoint.Port,)
-                if (localIpEndPoint != null)
-                    this.tcpClient.Client.Bind(localIpEndPoint);
-                this.tcpClient.Connect(this.remoteIpEndPoint);
-
-                if (this.tcpClient.Connected || this.SocketConnect(this.tcpClient.Client))
+                try
+                {
+                    this.sckClient.Connect(this.remoteIpEndPoint);
+                }
+                catch (SocketException sckEx)
+                {
+                    //有問題時再重新初始化後再連一次
+                    log.Error(m => m("[ConnectToServer] connect failed: {0}", sckEx.Message));
+                    this.Dispose();
+                    this.InitSocketClient();
+                    this.sckClient.Connect(this.remoteIpEndPoint);
+                }
+                if (this.sckClient.Connected || this.SocketConnect(this.sckClient))
                 {
                     //log.Info("Socket Client Connection " + this.ipEndPoint.Address.ToString() + " Success!");
                     return true;
@@ -179,16 +193,16 @@ namespace SocketClient.Domain
         {
             try
             {
-                if ((this.tcpClient != null && this.tcpClient.Connected) || this.SocketConnect(this.tcpClient.Client))
+                if ((this.sckClient != null && this.sckClient.Connected) || this.SocketConnect(this.sckClient))
                 {
                     //使用此方法不會自動丟出Socket上的錯誤例外,例外會在out參數產出
-                    int sendLength = this.tcpClient.Client.Send(poco, 0, poco.Length, SocketFlags.None);
+                    int sendLength = this.sckClient.Send(poco, 0, poco.Length, SocketFlags.None);
                     //(真實送出資料長度) == (要送出data長度)
                     if (sendLength == poco.Length)
                     {
                         byte[] receiveBytes = new byte[ReceiveBufferSize];
                         //使用此方法不會自動丟出Socket上的錯誤例外,例外會在out參數產出
-                        int receiveLength = this.tcpClient.Client.Receive(receiveBytes, 0, receiveBytes.Length, SocketFlags.None);
+                        int receiveLength = this.sckClient.Receive(receiveBytes, 0, receiveBytes.Length, SocketFlags.None);
                         if (receiveLength > 0)
                         {
                             Array.Resize(ref receiveBytes, receiveLength);
@@ -229,16 +243,16 @@ namespace SocketClient.Domain
         {
             try
             {
-                if ((this.tcpClient != null && this.tcpClient.Connected) || this.SocketConnect(this.tcpClient.Client))
+                if ((this.sckClient != null && this.sckClient.Connected) || this.SocketConnect(this.sckClient))
                 {
                     //使用此方法不會自動丟出Socket上的錯誤例外,例外會在out參數產出
-                    int sendLength = this.tcpClient.Client.Send(poco, 0, poco.Length, SocketFlags.None, out socketErr);
+                    int sendLength = this.sckClient.Send(poco, 0, poco.Length, SocketFlags.None, out socketErr);
                     //(真實送出資料長度) == (要送出data長度)
                     if (sendLength == poco.Length && socketErr == SocketError.Success)
                     {
                         byte[] receiveBytes = new byte[4096];
                         //使用此方法不會自動丟出Socket上的錯誤例外,例外會在out參數產出
-                        int receiveLength = this.tcpClient.Client.Receive(receiveBytes, 0, receiveBytes.Length, SocketFlags.None, out socketErr);
+                        int receiveLength = this.sckClient.Receive(receiveBytes, 0, receiveBytes.Length, SocketFlags.None, out socketErr);
                         if (receiveLength > 0 && socketErr == SocketError.Success)
                         {
                             Array.Resize(ref receiveBytes, receiveLength);
@@ -307,19 +321,22 @@ namespace SocketClient.Domain
         public void CloseConnection()
         {
             //log.Debug("Start Dispose...");
-            if (this.tcpClient != null)
+            if (this.sckClient != null)
             {
                 try
                 {
-                    if (this.tcpClient.Connected)
-                        this.tcpClient.Client.Shutdown(SocketShutdown.Both);
-                    this.tcpClient.Close();
-                    this.tcpClient = null;
+                    byte[] test = new byte[100]; int ee;
+                    if (this.sckClient.Connected && ((this.sckClient.Receive(test,SocketFlags.Peek)) != 0))
+                    {
+                        this.sckClient.Shutdown(SocketShutdown.Both);
+                    }
+                    this.sckClient.Close();
+                    this.sckClient = null;
                 }
                 catch (SocketException ex)
                 {
                     log.Error("Socket Client Dispose Error: " + ex.Message);
-                    this.tcpClient = null;
+                    this.sckClient = null;
                     //throw ex;
                 }
             }
